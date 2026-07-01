@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepSeek-V4-Flash 架构可视化</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 0.95em;
+        }
+
+        .architecture-section {
+            padding: 30px;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            color: #2c3e50;
+            margin-bottom: 25px;
+            border-left: 5px solid #3498db;
+            padding-left: 15px;
+        }
+
+        .flow-diagram {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .flow-node {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border-radius: 10px;
+            font-weight: bold;
+            text-align: center;
+            min-width: 250px;
+            box-shadow: 0 5px 15px rgba(52,152,219,0.3);
+        }
+
+        .flow-node.attention {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+
+        .flow-node.moe {
+            background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+        }
+
+        .flow-node.hc {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+        }
+
+        .flow-arrow {
+            width: 3px;
+            height: 30px;
+            background: linear-gradient(to bottom, #3498db, #2c3e50);
+        }
+
+        .parallel-paths {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .path-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            padding: 25px;
+            transition: all 0.3s ease;
+        }
+
+        .path-card:hover {
+            border-color: #3498db;
+            box-shadow: 0 10px 30px rgba(52,152,219,0.2);
+        }
+
+        .path-card.mla {
+            border-left: 5px solid #3498db;
+        }
+
+        .path-card.csa {
+            border-left: 5px solid #e74c3c;
+        }
+
+        .path-card.hca {
+            border-left: 5px solid #9b59b6;
+        }
+
+        .path-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .path-title .icon {
+            font-size: 1.5em;
+        }
+
+        .path-features {
+            list-style: none;
+        }
+
+        .path-features li {
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .path-features li:last-child {
+            border-bottom: none;
+        }
+
+        .checkmark {
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .moe-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .expert-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .expert-count {
+            font-size: 3em;
+            font-weight: bold;
+            color: #9b59b6;
+        }
+
+        .expert-label {
+            color: #7f8c8d;
+            margin-top: 10px;
+        }
+
+        .hc-mechanism {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-top: 30px;
+        }
+
+        .hc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .hc-item {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .hc-item h4 {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 30px;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .comparison-table th {
+            background: #3498db;
+            color: white;
+            padding: 15px;
+            text-align: left;
+        }
+
+        .comparison-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .comparison-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+            color: white;
+        }
+
+        .badge.blue { background: #3498db; }
+        .badge.red { background: #e74c3c; }
+        .badge.purple { background: #9b59b6; }
+        .badge.green { background: #27ae60; }
+
+        footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .animated {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 DeepSeek-V4-Flash 架构可视化</h1>
+            <p>基于 ModelScope 权重的深度架构分析</p>
+        </header>
+
+        <!-- 统计卡片 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">43</div>
+                <div class="stat-label">Transformer 层数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">79.8B</div>
+                <div class="stat-label">总参数量</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">256+1</div>
+                <div class="stat-label">MoE 专家数量</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">148.65 GB</div>
+                <div class="stat-label">模型大小</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">6</div>
+                <div class="stat-label">每 token 激活专家数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">~5.5%</div>
+                <div class="stat-label">参数激活率</div>
+            </div>
+        </div>
+
+        <!-- 整体架构流程 -->
+        <div class="architecture-section">
+            <h2 class="section-title">📊 整体数据流架构</h2>
+            
+            <div class="flow-diagram">
+                <div class="flow-node">输入 Embedding</div>
+                <div class="flow-arrow"></div>
+                <div class="flow-node">LayerNorm 1</div>
+                <div class="flow-arrow"></div>
+                <div class="flow-node attention">并行注意力机制 (MLA + CSA + HCA)</div>
+                <div class="flow-arrow"></div>
+                <div class="flow-node">残差连接 + LayerNorm 2</div>
+                <div class="flow-arrow"></div>
+                <div class="flow-node moe">MoE 前馈网络 (256 路由 +1 共享)</div>
+                <div class="flow-arrow"></div>
+                <div class="flow-node hc">HC 机制融合</div>
+                <div class="flow-arrow"></div>
+                <div class="flow-node">重复 ×43 层</div>
+                <div class="flow-arrow"></div>
+                <div class="flow-node">Final LayerNorm</div>
+                <div class="flow-arrow"></div>
+                <div class="flow-node">LM Head 输出</div>
+            </div>
+        </div>
+
+        <!-- 并行注意力路径 -->
+        <div class="architecture-section">
+            <h2 class="section-title">⚡ 三层并行注意力机制</h2>
+            
+            <div class="parallel-paths">
+                <div class="path-card mla">
+                    <div class="path-title">
+                        <span class="icon">🌊</span>
+                        MLA (Multi-head Latent Attention)
+                    </div>
+                    <ul class="path-features">
+                        <li><span class="checkmark">✓</span> 全局密集注意力</li>
+                        <li><span class="checkmark">✓</span> 低秩 KV 分解压缩</li>
+                        <li><span class="checkmark">✓</span> 显存节省 70%</li>
+                        <li><span class="checkmark">✓</span> wkv.weight/wkv.scale</li>
+                        <li><span class="checkmark">✓</span> q_norm & kv_norm</li>
+                        <li><span class="checkmark">✓</span> 标准 RoPE 位置编码</li>
+                    </ul>
+                </div>
+
+                <div class="path-card csa">
+                    <div class="path-title">
+                        <span class="icon">🎯</span>
+                        CSA (Compressed Sparse Attention)
+                    </div>
+                    <ul class="path-features">
+                        <li><span class="checkmark">✓</span> TopK=512 稀疏选择</li>
+                        <li><span class="checkmark">✓</span> C4 压缩器 (4:1 降维)</li>
+                        <li><span class="checkmark">✓</span> attn_sink 路由权重</li>
+                        <li><span class="checkmark">✓</span> 滑动窗口辅助</li>
+                        <li><span class="checkmark">✓</span> O(S log S) 复杂度</li>
+                        <li><span class="checkmark">✓</span> 压缩感知 RoPE</li>
+                    </ul>
+                </div>
+
+                <div class="path-card hca">
+                    <div class="path-title">
+                        <span class="icon">🔮</span>
+                        HCA (Hierarchical Compressed Attention)
+                    </div>
+                    <ul class="path-features">
+                        <li><span class="checkmark">✓</span> C128 压缩器 (128:1)</li>
+                        <li><span class="checkmark">✓</span> 层次化块选择</li>
+                        <li><span class="checkmark">✓</span> 跳过索引器</li>
+                        <li><span class="checkmark">✓</span> 超长上下文优化</li>
+                        <li><span class="checkmark">✓</span> 跨层 HC 融合</li>
+                        <li><span class="checkmark">✓</span> 多 CUDA Stream</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- MoE 结构 -->
+        <div class="architecture-section">
+            <h2 class="section-title">🔀 MoE 混合专家系统</h2>
+            
+            <div class="moe-grid">
+                <div class="expert-card">
+                    <div class="expert-count">256</div>
+                    <div class="expert-label">路由专家 (Routed Experts)</div>
+                </div>
+                <div class="expert-card">
+                    <div class="expert-count">1</div>
+                    <div class="expert-label">共享专家 (Shared Expert)</div>
+                </div>
+                <div class="expert-card">
+                    <div class="expert-count">6</div>
+                    <div class="expert-label">每 token 激活专家数</div>
+                </div>
+                <div class="expert-card">
+                    <div class="expert-count">w1/w2/w3</div>
+                    <div class="expert-label">每个专家 3 个线性层</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; background: #f8f9fa; padding: 25px; border-radius: 15px;">
+                <h3 style="color: #2c3e50; margin-bottom: 15px;">门控机制参数</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div style="background: white; padding: 15px; border-radius: 10px;">
+                        <strong>gate.weight</strong>
+                        <p style="color: #7f8c8d; margin-top: 5px;">专家路由权重矩阵</p>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 10px;">
+                        <strong>gate.tid2eid</strong>
+                        <p style="color: #7f8c8d; margin-top: 5px;">Token ID 到专家 ID 映射</p>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 10px;">
+                        <strong>shared_experts</strong>
+                        <p style="color: #7f8c8d; margin-top: 5px;">共享专家 w1/w2/w3</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HC 机制 -->
+        <div class="architecture-section">
+            <h2 class="section-title">🎯 HC (Head Coefficient) 机制</h2>
+            
+            <div class="hc-mechanism">
+                <h3 style="text-align: center; margin-bottom: 20px;">多头系数提取与动态路由</h3>
+                
+                <div class="hc-grid">
+                    <div class="hc-item">
+                        <h4>hc_attn_base</h4>
+                        <p>注意力基础系数</p>
+                    </div>
+                    <div class="hc-item">
+                        <h4>hc_attn_fn</h4>
+                        <p>注意力函数变换</p>
+                    </div>
+                    <div class="hc-item">
+                        <h4>hc_attn_scale</h4>
+                        <p>注意力缩放因子</p>
+                    </div>
+                    <div class="hc-item">
+                        <h4>hc_ffn_base</h4>
+                        <p>前馈基础系数</p>
+                    </div>
+                    <div class="hc-item">
+                        <h4>hc_ffn_fn</h4>
+                        <p>前馈函数变换</p>
+                    </div>
+                    <div class="hc-item">
+                        <h4>hc_ffn_scale</h4>
+                        <p>前馈缩放因子</p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 25px; background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px;">
+                    <h4 style="margin-bottom: 10px;">核心优势</h4>
+                    <ul style="list-style: none;">
+                        <li>✨ Sinkhorn 迭代归一化优化路由</li>
+                        <li>✨ 跨层 HC Pre/Post 融合减少通信</li>
+                        <li>✨ 动态负载均衡避免专家坍塌</li>
+                        <li>✨ hc_mult=4 维度扩展捕获多粒度特征</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 对比表格 -->
+        <div class="architecture-section">
+            <h2 class="section-title">📈 架构对比分析</h2>
+            
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>特性</th>
+                        <th>DeepSeek-V4</th>
+                        <th>GPT-4</th>
+                        <th>LLaMA 3</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>注意力机制</strong></td>
+                        <td><span class="badge blue">MLA+CSA+HCA</span></td>
+                        <td><span class="badge red">标准 MHA</span></td>
+                        <td><span class="badge green">GQA</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>MoE 配置</strong></td>
+                        <td><span class="badge purple">256+1 专家</span></td>
+                        <td><span class="badge blue">推测 MoE</span></td>
+                        <td><span class="badge red">稠密</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>参数量</strong></td>
+                        <td>79.8B (总)</td>
+                        <td>~1.8T (估计)</td>
+                        <td>70B</td>
+                    </tr>
+                    <tr>
+                        <td><strong>激活参数</strong></td>
+                        <td>~5.5%</td>
+                        <td>~2-3%</td>
+                        <td>100%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>KV Cache</strong></td>
+                        <td><span class="badge blue">压缩 70%</span></td>
+                        <td><span class="badge red">标准</span></td>
+                        <td><span class="badge green">GQA 优化</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>量化支持</strong></td>
+                        <td><span class="badge green">FP8/FP4/W8A8</span></td>
+                        <td><span class="badge blue">FP8</span></td>
+                        <td><span class="badge blue">FP8</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 优化技术总结 -->
+        <div class="architecture-section">
+            <h2 class="section-title">🚀 核心优化技术</h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 15px;">
+                    <h3 style="margin-bottom: 15px;">⚡ NSA 稀疏注意力</h3>
+                    <ul style="list-style: none;">
+                        <li>• 三种稀疏模式动态切换</li>
+                        <li>• 复杂度 O(S²) → O(S log S)</li>
+                        <li>• 长序列加速 3-5 倍</li>
+                    </ul>
+                </div>
+
+                <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 25px; border-radius: 15px;">
+                    <h3 style="margin-bottom: 15px;">💾 MLA 低秩压缩</h3>
+                    <ul style="list-style: none;">
+                        <li>• KV Cache 压缩 70%</li>
+                        <li>• 低秩分解保持精度</li>
+                        <li>• 显存占用大幅降低</li>
+                    </ul>
+                </div>
+
+                <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 25px; border-radius: 15px;">
+                    <h3 style="margin-bottom: 15px;">🔄 分布式并行</h3>
+                    <ul style="list-style: none;">
+                        <li>• TP/EP/DP/CP/PP 全方位</li>
+                        <li>• Reduce-Scatter 优化</li>
+                        <li>• 多机多卡高效训练</li>
+                    </ul>
+                </div>
+
+                <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 25px; border-radius: 15px;">
+                    <h3 style="margin-bottom: 15px;">🎯 量化加速</h3>
+                    <ul style="list-style: none;">
+                        <li>• FP8/FP4混合精度</li>
+                        <li>• W8A8 推理加速</li>
+                        <li>• 动态缩放保精度</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>DeepSeek-V4-Flash 架构可视化 | 基于 ModelScope 权重分析</p>
+            <p style="margin-top: 10px; opacity: 0.8;">数据来源：model.safetensors.index.json | 生成时间：<span id="timestamp"></span></p>
+        </footer>
+    </div>
+
+    <script>
+        // 更新时间戳
+        document.getElementById('timestamp').textContent = new Date().toLocaleString('zh-CN');
+
+        // 添加交互动画
+        document.querySelectorAll('.stat-card, .path-card, .expert-card').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-8px)';
+            });
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+            });
+        });
+
+        // 数字滚动动画
+        function animateValue(element, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                element.textContent = Math.floor(progress * (end - start) + start);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // 页面加载后触发动画
+        window.addEventListener('load', () => {
+            document.querySelectorAll('.stat-value').forEach(el => {
+                el.classList.add('animated');
+            });
+        });
+    </script>
+</body>
+</html>
